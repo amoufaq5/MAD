@@ -6,7 +6,8 @@ from datetime import datetime
 from tqdm import tqdm
 
 # Load spaCy model (medical model)
-nlp = spacy.load("en_core_sci_sm")  # Replace with en_core_sci_sm if using scispacy
+nlp = spacy.load("en_core_web_sm")
+
 
 def extract_entities(text):
     doc = nlp(text)
