@@ -2,19 +2,21 @@ import requests
 import logging
 from bs4 import BeautifulSoup
 import os
+from datetime import datetime
 
-# Set up logging configuration for web scraping
+# Configure logging
 logging.basicConfig(
     filename='scraper.log',
     filemode='a',
-    format='%(asctime)s %(levelname)s: %(message)s',
+    format='%(asctime)s [%(levelname)s] %(message)s',
     level=logging.INFO
 )
 
-# Dictionary of reputable sources and their URLs
+# Dictionary of sources including Drugs.com OTC
 SOURCES = {
     "FDA_Drug_Databases": "https://www.fda.gov/drugs/drug-approvals-and-databases",
-    "Drugs.com": "https://www.drugs.com",
+    "Drugs_com_Home": "https://www.drugs.com",
+    "Drugs_com_OTC": "https://www.drugs.com/otc.html",  # Specifically for OTC meds
     "DailyMed": "https://dailymed.nlm.nih.gov/dailymed/index.cfm",
     "MedlinePlus": "https://medlineplus.gov",
     "CDC": "https://www.cdc.gov",
@@ -23,33 +25,42 @@ SOURCES = {
     "WebMD": "https://www.webmd.com",
     "PubMed": "https://pubmed.ncbi.nlm.nih.gov",
     "Cochrane_Library": "https://www.cochranelibrary.com",
-    "ClinicalTrials": "https://clinicaltrials.gov",
+    "ClinicalTrials_Home": "https://clinicaltrials.gov",
     "PubMedCentral": "https://www.pubmedcentral.nih.gov"
 }
 
 def scrape_site(url, output_file):
+    """
+    Generic HTML scrape using requests + BeautifulSoup.
+    Removes script/style tags and writes raw text to a file.
+    """
     try:
         headers = {
-            'User-Agent': 'Mozilla/5.0 (compatible; AI Medical Diagnostic Bot/1.0; +http://yourdomain.com/bot)'
+            'User-Agent': 'Mozilla/5.0 (compatible; MAD/1.0; +http://example.com/bot)'
         }
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()  # Will raise HTTPError for bad responses
+        logging.info(f"Attempting to scrape: {url}")
+        response = requests.get(url, headers=headers, timeout=20)
+        response.raise_for_status()  # Raise HTTPError if status_code >= 400
 
-        soup = BeautifulSoup(response.content, "html.parser")
-        # Remove scripts and styles for cleaner text extraction
+        soup = BeautifulSoup(response.text, "html.parser")
+        # Remove script/style to clean text
         for script in soup(["script", "style"]):
             script.decompose()
         text = soup.get_text(separator="\n")
 
+        # Write raw text to output file
         with open(output_file, "w", encoding="utf-8") as f:
             f.write(text)
-        logging.info(f"Successfully scraped {url} to {output_file}")
+
+        logging.info(f"Successfully scraped {url} and saved to {output_file}")
     except Exception as e:
         logging.error(f"Error scraping {url}: {e}")
 
 if __name__ == "__main__":
     os.makedirs("data/raw", exist_ok=True)
-    for source, url in SOURCES.items():
-        output_file = os.path.join("data/raw", f"{source}.txt")
-        logging.info(f"Starting scrape for {source}: {url}")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+
+    # Loop through each source in SOURCES
+    for name, url in SOURCES.items():
+        output_file = os.path.join("data/raw", f"{name}_{timestamp}.txt")
         scrape_site(url, output_file)
