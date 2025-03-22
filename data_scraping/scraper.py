@@ -1,66 +1,63 @@
-import requests
-import logging
-from bs4 import BeautifulSoup
+# data_scraping/scraper.py
 import os
-from datetime import datetime
+import logging
+import pandas as pd
+import requests
+from sources_config import SOURCES, generic_parser
 
-# Configure logging
 logging.basicConfig(
     filename='scraper.log',
     filemode='a',
-    format='%(asctime)s [%(levelname)s] %(message)s',
+    format='%(asctime)s %(levelname)s: %(message)s',
     level=logging.INFO
 )
 
-# Dictionary of sources including Drugs.com OTC
-SOURCES = {
-    "FDA_Drug_Databases": "https://www.fda.gov/drugs/drug-approvals-and-databases",
-    "Drugs_com_Home": "https://www.drugs.com",
-    "Drugs_com_OTC": "https://www.drugs.com/otc.html",  # Specifically for OTC meds
-    "DailyMed": "https://dailymed.nlm.nih.gov/dailymed/index.cfm",
-    "MedlinePlus": "https://medlineplus.gov",
-    "CDC": "https://www.cdc.gov",
-    "WHO": "https://www.who.int",
-    "Mayo_Clinic": "https://www.mayoclinic.org",
-    "WebMD": "https://www.webmd.com",
-    "PubMed": "https://pubmed.ncbi.nlm.nih.gov",
-    "Cochrane_Library": "https://www.cochranelibrary.com",
-    "ClinicalTrials_Home": "https://clinicaltrials.gov",
-    "PubMedCentral": "https://www.pubmedcentral.nih.gov"
-}
+def scrape_and_save_excel(output_excel="data/aggregated.xlsx"):
+    os.makedirs("data/raw", exist_ok=True)
+    records = []
 
-def scrape_site(url, output_file):
-    """
-    Generic HTML scrape using requests + BeautifulSoup.
-    Removes script/style tags and writes raw text to a file.
-    """
-    try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (compatible; MAD/1.0; +http://example.com/bot)'
-        }
-        logging.info(f"Attempting to scrape: {url}")
-        response = requests.get(url, headers=headers, timeout=20)
-        response.raise_for_status()  # Raise HTTPError if status_code >= 400
+    for source_info in SOURCES:
+        name = source_info["name"]
+        url = source_info["url"]
+        parser_name = source_info["parser"]
 
-        soup = BeautifulSoup(response.text, "html.parser")
-        # Remove script/style to clean text
-        for script in soup(["script", "style"]):
-            script.decompose()
-        text = soup.get_text(separator="\n")
+        logging.info(f"Scraping {name} from {url}")
+        try:
+            headers = {
+                "User-Agent": "Mozilla/5.0 (compatible; AI Medical Diagnostic Bot/1.0; +http://yourdomain.com/bot)"
+            }
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
 
-        # Write raw text to output file
-        with open(output_file, "w", encoding="utf-8") as f:
-            f.write(text)
+            # Save raw HTML
+            raw_file = os.path.join("data/raw", f"{name}.html")
+            with open(raw_file, "wb") as f:
+                f.write(response.content)
 
-        logging.info(f"Successfully scraped {url} and saved to {output_file}")
-    except Exception as e:
-        logging.error(f"Error scraping {url}: {e}")
+            # Parse
+            if parser_name == "generic_parser":
+                parsed_data = generic_parser(response.content, url)
+            else:
+                parsed_data = {}
+
+            # Build record
+            record = {
+                "disease": parsed_data.get("disease", ""),
+                "symptoms": parsed_data.get("symptoms", ""),
+                "medication": parsed_data.get("medication", ""),
+                "content": parsed_data.get("content", ""),
+                "title": parsed_data.get("title", "")
+            }
+            records.append(record)
+
+            logging.info(f"Successfully scraped {name}")
+        except Exception as e:
+            logging.error(f"Error scraping {name}: {e}")
+
+    # Convert to DataFrame and save to Excel
+    df = pd.DataFrame(records, columns=["disease", "symptoms", "medication", "content", "title"])
+    df.to_excel(output_excel, index=False)
+    logging.info(f"Aggregated data saved to {output_excel}")
 
 if __name__ == "__main__":
-    os.makedirs("data/raw", exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-
-    # Loop through each source in SOURCES
-    for name, url in SOURCES.items():
-        output_file = os.path.join("data/raw", f"{name}_{timestamp}.txt")
-        scrape_site(url, output_file)
+    scrape_and_save_excel()
