@@ -1,18 +1,18 @@
-# Use an official Python runtime as the base image
-FROM python:3.8-slim
+# Use official Python base image
+FROM python:3.9-slim
 
-# Set working directory
+# Create app directory
 WORKDIR /app
 
-# Copy and install dependencies
+# Copy requirements and install
 COPY requirements.txt .
-RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
+    && pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application code
+# Copy project code
 COPY . .
 
-# Expose the port on which the Flask app will run
+# Expose Flask port
 EXPOSE 5000
 
-# Run the Flask application
 CMD ["python", "app/app.py"]
