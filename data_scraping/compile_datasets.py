@@ -1,28 +1,8 @@
 # data_scraping/compile_datasets.py
 import pandas as pd
 import os
-import spacy
 from datetime import datetime
 from tqdm import tqdm
-
-# Load spaCy model (medical model)
-nlp = spacy.load("en_core_web_sm")
-
-
-def extract_entities(text):
-    doc = nlp(text)
-    symptoms = []
-    medications = []
-    diseases = []
-    for ent in doc.ents:
-        label = ent.label_.lower()
-        if label in ["disease", "condition"]:
-            diseases.append(ent.text)
-        elif label in ["drug", "medication"]:
-            medications.append(ent.text)
-        elif label in ["symptom", "sign"]:
-            symptoms.append(ent.text)
-    return list(set(symptoms)), list(set(medications)), list(set(diseases))
 
 def quality_score(row):
     score = 0
@@ -47,21 +27,8 @@ def compile_csvs():
         df["timestamp"] = datetime.now().isoformat()
         df["source_file"] = file
 
-        # Fill missing fields using SpaCy
-        for i, row in df.iterrows():
-            content = str(row.get("content", ""))
-            if not content.strip(): continue
-            symptoms, meds, diseases = extract_entities(content)
-
-            if not row.get("symptoms") and symptoms:
-                df.at[i, "symptoms"] = ", ".join(symptoms)
-            if not row.get("medication") and meds:
-                df.at[i, "medication"] = ", ".join(meds)
-            if not row.get("disease") and diseases:
-                df.at[i, "disease"] = ", ".join(diseases)
-
-            df.at[i, "entity_counts"] = len(symptoms) + len(meds) + len(diseases)
-            df.at[i, "quality_score"] = quality_score(df.loc[i])
+        df["entity_counts"] = 0  # placeholder
+        df["quality_score"] = df.apply(quality_score, axis=1)
 
         dfs.append(df)
 
